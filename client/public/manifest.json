@@ -1,0 +1,35 @@
+{
+  "name": "Urvi Tours & Travels",
+  "short_name": "Urvi Tours",
+  "description": "Book your cab with Urvi Tours & Travels",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "transportation"],
+  "shortcuts": [
+    {
+      "name": "Browse Cars",
+      "short_name": "Cars",
+      "description": "View available cars",
+      "url": "/cars",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Contact Us",
+      "short_name": "Contact",
+      "description": "Get in touch",
+      "url": "/contact",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ]
+}
