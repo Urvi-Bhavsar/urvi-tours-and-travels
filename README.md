@@ -76,7 +76,7 @@ DB_PASSWORD=root123
 DB_NAME=urvi_tours
 DB_SSL=false
 
-ADMIN_EMAIL=urvi.toursandtravells@gmail.com
+ADMIN_EMAIL=your-admin-email@example.com
 ADMIN_PASSWORD=your-admin-password
 JWT_SECRET=any-long-random-string
 CLIENT_URL=http://localhost:5173
@@ -124,7 +124,7 @@ Order: database, then backend, then frontend, then update CORS.
 | `DB_PASSWORD` | from TiDB |
 | `DB_NAME` | `urvi_tours` |
 | `DB_SSL` | `true` |
-| `ADMIN_EMAIL` | `urvi.toursandtravells@gmail.com` |
+| `ADMIN_EMAIL` | `your-admin-email@example.com` |
 | `ADMIN_PASSWORD` | your admin password |
 | `JWT_SECRET` | long random string (`node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`) |
 | `CLIENT_URL` | set after Step C; use `http://localhost:5173` for now |
