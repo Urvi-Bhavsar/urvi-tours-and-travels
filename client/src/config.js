@@ -6,8 +6,8 @@ export const profile = {
   initials: 'UT', // shown in the avatar circle. Or set photo: '/profile.jpg' (put the file in client/public)
   photo: '',
   instagram: 'https://instagram.com/your_instagram_handle',
-  phone: '919876543210', // country code + number, digits only
-  whatsapp: '919876543210',
+  phone: '916352806858', // country code + number, digits only
+  whatsapp: '916352806858',
   whatsappText: 'Hi! I found you on Instagram and want to book a car.',
 };
 
