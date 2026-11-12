@@ -1,0 +1,43 @@
+/* ---------- Public layout: top menu, sections, detail page ---------- */
+.page { max-width: 960px; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+}
+.brand { font-weight: 700; font-size: 15px; text-decoration: none; }
+.topnav { display: flex; gap: 2px; }
+.topnav a { padding: 7px 11px; border-radius: 999px; text-decoration: none; font-size: 13px; font-weight: 500; color: var(--muted); }
+.topnav a.active { background: var(--brand); color: #fff; }
+
+.hero { padding-top: 28px; }
+.hero-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.section-head h2 { margin-bottom: 0; }
+.link-inline { font-size: 14px; font-weight: 700; color: var(--call); text-decoration: none; }
+.link-inline.center { display: block; text-align: center; }
+.chips.wrap { flex-wrap: wrap; overflow: visible; }
+.chip { text-decoration: none; display: inline-block; }
+
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.spaced { margin-top: 14px; }
+.center-note { text-align: center; padding: 48px 16px; }
+
+/* cars grid: 1 column on phones, 2 on tablets, 3 on desktop */
+@media (min-width: 860px) { .cars { grid-template-columns: 1fr 1fr 1fr; } }
+.car-img-link { display: block; }
+.car-btns { display: flex; gap: 8px; margin-top: 10px; }
+.car-btns .btn { flex: 1; padding: 11px 10px; font-size: 14px; }
+
+.detail { display: flex; flex-direction: column; gap: 10px; }
+.detail-img { width: 100%; max-height: 420px; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 16px; background: #e2e8f0; display: block; }
+.detail h2 { margin: 0; }
+.facts { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.btn-wide { width: 100%; }
+.thanks .hero-btns { margin-top: 16px; }
+
+/* ---------- Admin layout ---------- */
+.admin { max-width: 900px; }
+a.main-tab { text-align: center; text-decoration: none; display: block; }
+.car-img-link { text-decoration: none; color: inherit; }
