@@ -4,9 +4,9 @@ Public website where clients see cars with their rate per km and send booking in
 
 ```
 urvi-tours-travells/
-  client/   React (Vite)   -> deploy on Vercel
-  server/   Node/Express   -> deploy on Railway
-                           -> database: TiDB Cloud (MySQL compatible)
+  client/   React (Vite)   -> deploy on Vercel: https://urvi-tours-and-travels.vercel.app/
+  server/   Node/Express   -> deploy on Render
+  database/ MySQL-compatible -> TiDB Cloud (production), local MySQL for development
 ```
 
 ## Pages
@@ -31,7 +31,7 @@ urvi-tours-travells/
 
 Any `/admin/...` URL without a valid login redirects to `/admin/login`, and after signing in you land on the page you asked for. The backend also checks the login token on every admin API call.
 
-**Admin login:** the email and password come from the server variables `ADMIN_EMAIL` and `ADMIN_PASSWORD` (set them in `server/.env` locally and in Railway for production). They are never stored in the client code or in git.
+**Admin login:** the email and password come from the server variables `ADMIN_EMAIL` and `ADMIN_PASSWORD` (set them in `server/.env` locally and in Render for production). They are never stored in the client code or in git.
 
 **Types of booking:** One way, Round trip, Local / hourly, Airport transfer (edit the list in `client/src/config.js` and `TRIP_TYPES` in `server/src/db.js`).
 
@@ -72,13 +72,13 @@ Local `server/.env` (MySQL on your machine):
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=root123
+DB_PASSWORD=XXXXX
 DB_NAME=urvi_tours
 DB_SSL=false
 
-ADMIN_EMAIL=your-admin-email@example.com
-ADMIN_PASSWORD=your-admin-password
-JWT_SECRET=any-long-random-string
+ADMIN_EMAIL=XXXXX
+ADMIN_PASSWORD=XXXXX
+JWT_SECRET=XXXXX
 CLIENT_URL=http://localhost:5173
 PORT=4000
 ```
@@ -110,11 +110,11 @@ Order: database, then backend, then frontend, then update CORS.
 3. Note these four values: host (like `gateway01.ap-southeast-1.prod.aws.tidbcloud.com`), port (`4000`), user (like `abc123xyz.root`, with the prefix), and the password.
 4. No SQL to run by hand. The server creates the `urvi_tours` database and its tables on first start. If TiDB refuses to create a database for your user, set `DB_NAME=test` and it will use the default `test` database instead.
 
-### Step B: Railway (backend)
+### Step B: Render (backend)
 1. Push the project to a GitHub repository.
-2. In Railway: **New Project -> Deploy from GitHub repo** and pick the repo.
-3. In the service **Settings**, set **Root Directory** to `server`. The start command `npm start` is picked up automatically.
-4. Open **Variables** and add:
+2. In Render: **New -> Web Service**, connect the repo, and set the **Root Directory** to `server`.
+3. The build command should be `npm run build`, and the start command should be `npm start`.
+4. Open **Environment** and add:
 
 | Variable | Value |
 |---|---|
@@ -124,13 +124,13 @@ Order: database, then backend, then frontend, then update CORS.
 | `DB_PASSWORD` | from TiDB |
 | `DB_NAME` | `urvi_tours` |
 | `DB_SSL` | `true` |
-| `ADMIN_EMAIL` | `your-admin-email@example.com` |
-| `ADMIN_PASSWORD` | your admin password |
-| `JWT_SECRET` | long random string (`node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`) |
+| `ADMIN_EMAIL` | `XXXXX` |
+| `ADMIN_PASSWORD` | `XXXXX` |
+| `JWT_SECRET` | `XXXXX` |
 | `CLIENT_URL` | set after Step C; use `http://localhost:5173` for now |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | optional, see section 4 |
 
-5. **Settings -> Networking -> Generate Domain**. Open `https://<your-service>.up.railway.app/health`. You should see `{"ok":true}`. If the deploy logs say `Database connection failed`, re-check the TiDB values.
+5. Deploy the service. Open `https://<your-render-service>.onrender.com/health`. You should see `{"ok":true}`. If the deploy logs say `Database connection failed`, re-check the TiDB values.
 
 ### Step C: Vercel (frontend)
 1. In Vercel: **Add New -> Project**, import the same repo.
@@ -139,9 +139,9 @@ Order: database, then backend, then frontend, then update CORS.
 4. Deploy. `client/vercel.json` already makes `/cars`, `/book` and `/admin/...` work when refreshed.
 
 ### Step D: Connect them
-1. In Railway, set `CLIENT_URL` to your Vercel URL (and your custom domain if any), comma separated, no trailing slash:
+1. In Render, set `CLIENT_URL` to your Vercel URL (and your custom domain if any), comma separated, no trailing slash:
    `https://yourdomain.com,https://your-project.vercel.app`
-2. Railway redeploys automatically.
+2. Trigger a new deploy in Render.
 3. Open the site, send a test inquiry, then log in at `/admin/login`.
 
 ### Step E: Custom domain (optional, recommended)
@@ -177,7 +177,7 @@ You get a message for each new inquiry, plus a **9:00 AM IST** summary of follow
 - Public form: honeypot field, rate limit (5 per IP per 15 min), server-side validation of Indian mobile numbers, and parameterised SQL queries.
 - Admin: password login with a signed token (7 days), login rate limit, every admin API route needs the token, admin pages send `noindex`.
 - CORS allows only your listed sites. Helmet adds secure headers.
-- Keep `ADMIN_PASSWORD`, `JWT_SECRET` and `DB_PASSWORD` only in environment variables, never in the repo. `.env` is git-ignored.
+- Keep `ADMIN_PASSWORD`, `JWT_SECRET`, `DB_PASSWORD`, and any API tokens only in environment variables, never in the repo. Use `XXXXX` placeholders in docs and examples. `.env` is git-ignored.
 
 ## 7. Troubleshooting
 
