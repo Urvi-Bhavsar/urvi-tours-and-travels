@@ -5,7 +5,7 @@ export const profile = {
   bio: 'Pick a car, tell us your trip, and we will call you back with the fare. Clean cars, experienced drivers, fair per-km rates.',
   initials: 'UT', // shown in the avatar circle. Or set photo: '/profile.jpg' (put the file in client/public)
   photo: '',
-  instagram: 'https://instagram.com/your_instagram_handle',
+  instagram: 'https://instagram.com/urvitours_2022',
   phone: '916352806858', // country code + number, digits only
   whatsapp: '916352806858',
   whatsappText: 'Hi! I found you on Instagram and want to book a car.',
