@@ -43,7 +43,11 @@ export default function Home() {
           <h2>Popular cars</h2>
           {cars.length > 3 && <Link className="link-inline" to="/cars">See all</Link>}
         </div>
-        {state === 'loading' && <p className="muted">Loading cars...</p>}
+        {state === 'loading' && (
+          <div className="inline-loader" aria-label="Loading cars">
+            <span className="spinner" />
+          </div>
+        )}
         {state === 'error' && <p className="muted">Could not load cars right now. You can still call us or send an inquiry.</p>}
         {state === 'ready' && !cars.length && <p className="muted">Cars will be listed here soon. Call us for rates.</p>}
         <div className="cars">

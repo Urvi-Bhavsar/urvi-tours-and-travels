@@ -170,46 +170,51 @@ const toDto = (r) => ({
 const OPEN_SQL = "status NOT IN ('converted','closed')";
 
 router.get('/inquiries', async (req, res) => {
-  const { status, q, followup } = req.query;
-  const where = [];
-  const params = [];
+  try {
+    const { status, q, followup } = req.query;
+    const where = [];
+    const params = [];
 
-  if (status && STATUSES.includes(status)) {
-    where.push('i.status = ?');
-    params.push(status);
+    if (status && STATUSES.includes(status)) {
+      where.push('i.status = ?');
+      params.push(status);
+    }
+    if (followup === 'today') {
+      // due today or overdue, and still open
+      where.push('i.follow_up_date IS NOT NULL AND i.follow_up_date <= ? AND i.status NOT IN (\'converted\',\'closed\')');
+      params.push(todayIST());
+    }
+    if (q && String(q).trim()) {
+      const like = `%${likeEscape(String(q).trim().slice(0, 100))}%`;
+      where.push('(i.name LIKE ? OR i.phone LIKE ? OR i.message LIKE ? OR i.email LIKE ? OR i.pickup LIKE ? OR i.drop_location LIKE ? OR i.car_name LIKE ?)');
+      params.push(like, like, like, like, like, like, like);
+    }
+
+    const [rows] = await pool.query(
+      `SELECT i.*, (SELECT COUNT(*) FROM notes n WHERE n.inquiry_id = i.id) AS note_count
+         FROM inquiries i
+         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+         ORDER BY i.created_at DESC, i.id DESC
+         LIMIT 300`,
+      params
+    );
+
+    const [[counts]] = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END), 0) AS new_count,
+         COALESCE(SUM(CASE WHEN follow_up_date IS NOT NULL AND follow_up_date <= ? AND status NOT IN ('converted','closed') THEN 1 ELSE 0 END), 0) AS due_count
+       FROM inquiries`,
+      [todayIST()]
+    );
+
+    res.json({
+      inquiries: rows.map(toDto),
+      counts: { new: Number(counts.new_count), due: Number(counts.due_count) },
+    });
+  } catch (err) {
+    console.error('GET /api/admin/inquiries failed:', err);
+    res.status(500).json({ error: 'Failed to load inquiries' });
   }
-  if (followup === 'today') {
-    // due today or overdue, and still open
-    where.push(`i.follow_up_date IS NOT NULL AND i.follow_up_date <= ? AND i.${OPEN_SQL}`);
-    params.push(todayIST());
-  }
-  if (q && String(q).trim()) {
-    const like = `%${likeEscape(String(q).trim().slice(0, 100))}%`;
-    where.push('(i.name LIKE ? OR i.phone LIKE ? OR i.message LIKE ? OR i.email LIKE ? OR i.pickup LIKE ? OR i.drop_location LIKE ? OR i.car_name LIKE ?)');
-    params.push(like, like, like, like, like, like, like);
-  }
-
-  const [rows] = await pool.query(
-    `SELECT i.*, (SELECT COUNT(*) FROM notes n WHERE n.inquiry_id = i.id) AS note_count
-       FROM inquiries i
-       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-       ORDER BY i.created_at DESC, i.id DESC
-       LIMIT 300`,
-    params
-  );
-
-  const [[counts]] = await pool.query(
-    `SELECT
-       COALESCE(SUM(status = 'new'), 0) AS new_count,
-       COALESCE(SUM(follow_up_date IS NOT NULL AND follow_up_date <= ? AND ${OPEN_SQL}), 0) AS due_count
-     FROM inquiries`,
-    [todayIST()]
-  );
-
-  res.json({
-    inquiries: rows.map(toDto),
-    counts: { new: Number(counts.new_count), due: Number(counts.due_count) },
-  });
 });
 
 const patchSchema = z.object({
@@ -262,26 +267,6 @@ router.post('/inquiries/:id/notes', async (req, res) => {
   if (!exists.length) return res.status(404).json({ error: 'Not found' });
   await pool.query('INSERT INTO notes (inquiry_id, note) VALUES (?, ?)', [req.params.id, parsed.data.note]);
   res.json({ ok: true });
-});
-
-function csvCell(v) {
-  let s = v == null ? '' : String(v);
-  // stop spreadsheet formula injection
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
-  return `"${s.replace(/"/g, '""')}"`;
-}
-
-router.get('/export.csv', async (_req, res) => {
-  const [rows] = await pool.query('SELECT * FROM inquiries ORDER BY created_at DESC, id DESC');
-  const data = rows.map(toDto);
-  const cols = [
-    'id', 'name', 'phone', 'email', 'car_name', 'car_type', 'car_rate', 'trip_type',
-    'pickup', 'drop', 'travel_date', 'passengers', 'message', 'source', 'status', 'follow_up_date', 'created_at',
-  ];
-  const csv = [cols.join(','), ...data.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n');
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="inquiries.csv"');
-  res.send(csv);
 });
 
 export default router;

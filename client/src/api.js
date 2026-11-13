@@ -63,14 +63,4 @@ export const api = {
   updateCar: (id, data) => request(`/api/admin/cars/${id}`, { method: 'PATCH', body: data, auth: true }),
   deleteCar: (id) => request(`/api/admin/cars/${id}`, { method: 'DELETE', auth: true }),
 
-  async downloadCsv() {
-    const res = await request('/api/admin/export.csv', { auth: true, raw: true });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'inquiries.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  },
 };

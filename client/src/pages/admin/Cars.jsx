@@ -96,25 +96,36 @@ export default function Cars() {
       )}
 
       {error && <p className="error">{error}</p>}
-      {loading && <p className="muted">Loading...</p>}
+      {loading && (
+        <div className="inline-loader" aria-label="Loading">
+          <span className="spinner" />
+        </div>
+      )}
       {!loading && !cars.length && !error && <p className="muted">No cars yet. Tap "Add car" to add your first one.</p>}
 
       {cars.map((c) => {
         const rate = c.is_ac ? c.rate_per_km : c.rate_per_km_non_ac || c.rate_per_km;
+        const primaryPhoto = c.image_url || c.photos?.[0] || null;
+
         return (
           <div className={`car-row-admin ${c.active ? '' : 'inactive'}`} key={c.id}>
-            {c.image_url ? (
-              <img className="thumb" src={assetUrl(c.image_url)} alt="" />
+            {primaryPhoto ? (
+              <div className="thumb-collage">
+                <img className="thumb thumb-photo thumb-photo-main" src={assetUrl(primaryPhoto)} alt="" />
+              </div>
             ) : (
               <div className="thumb thumb-empty">{c.is_ac ? 'AC' : 'N'}</div>
             )}
             <div className="car-info">
               <strong>{c.name}</strong>
               <div className="muted small">
-                {c.is_ac ? 'AC' : 'Non-AC'} · {c.seats} seats{c.min_km_per_day ? ` · min ${c.min_km_per_day} km/day` : ''}
+                {c.seats} seats{c.min_km_per_day ? ` · min ${c.min_km_per_day} km/day` : ''}
               </div>
               <div className="car-price">
-                &#8377;{rate}/km
+                {c.rate_per_km ? <>₹{c.rate_per_km}/km <span className="muted small">AC</span></> : null}
+                {c.rate_per_km_non_ac ? <>
+                  {c.rate_per_km ? ' · ' : ''}₹{c.rate_per_km_non_ac}/km <span className="muted small">Non-AC</span>
+                </> : null}
                 {c.driver_batta_per_day ? ` · driver ₹${c.driver_batta_per_day}/day` : ''}
                 {!c.active && <span className="badge badge-closed">Hidden</span>}
               </div>
@@ -147,19 +158,56 @@ function CarForm({ car, onCancel, onSaved }) {
         }
       : blank
   );
-  const [img, setImg] = useState({ preview: car?.image_url ? assetUrl(car.image_url) : null, changed: false, data: [] });
+  const [img, setImg] = useState({
+    primary: car?.image_url ? assetUrl(car.image_url) : null,
+    gallery: car?.photos?.length ? car.photos.filter((p) => p !== car.image_url).map((p) => assetUrl(p)) : [],
+    primaryData: car?.image_url ? car.image_url : null,
+    galleryData: car?.photos?.length ? car.photos.filter((p) => p !== car.image_url) : [],
+    primaryChanged: false,
+    galleryChanged: false,
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
-  async function pickImage(e) {
+  function removePrimaryPhoto() {
+    setImg((prev) => ({ ...prev, primary: null, primaryData: null, primaryChanged: true }));
+  }
+
+  function removeGalleryPhoto(index) {
+    setImg((prev) => {
+      const nextGallery = prev.gallery.filter((_, i) => i !== index);
+      const nextGalleryData = prev.galleryData.filter((_, i) => i !== index);
+      return { ...prev, gallery: nextGallery, galleryData: nextGalleryData, galleryChanged: true };
+    });
+  }
+
+  async function pickPrimaryImage(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    try {
+      const data = await resizeImage(file);
+      setImg((prev) => ({ ...prev, primary: data, primaryData: data, primaryChanged: true }));
+    } catch (err) {
+      setError(err.message);
+    }
+    e.target.value = '';
+  }
+
+  async function pickGalleryImages(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setError('');
     try {
       const data = await Promise.all(files.map((file) => resizeImage(file)));
-      setImg({ preview: data[0], changed: true, data });
+      setImg((prev) => ({
+        ...prev,
+        gallery: [...prev.gallery, ...data],
+        galleryData: [...prev.galleryData, ...data],
+        galleryChanged: true,
+      }));
     } catch (err) {
       setError(err.message);
     }
@@ -175,9 +223,10 @@ function CarForm({ car, onCancel, onSaved }) {
     if (!Number.isFinite(rate) || rate < 0) return setError('Enter a valid AC rate per km');
     if (f.rate_per_km_non_ac && (!Number.isFinite(nonAcRate) || nonAcRate < 0)) return setError('Enter a valid non-AC rate per km');
 
+    const isAc = !f.rate_per_km_non_ac || Number(f.rate_per_km_non_ac) === 0;
     const payload = {
       name: f.name,
-      is_ac: Boolean(f.is_ac),
+      is_ac: isAc,
       seats: Number(f.seats) || 4,
       rate_per_km: rate,
       rate_per_km_non_ac: f.rate_per_km_non_ac ? nonAcRate : 0,
@@ -186,9 +235,11 @@ function CarForm({ car, onCancel, onSaved }) {
       description: f.description,
       active: f.active,
     };
-    if (img.changed) {
-      payload.photos = img.data;
-      payload.image = img.data[0] || null;
+    if (img.primaryChanged) {
+      payload.image = img.primaryData || null;
+    }
+    if (img.galleryChanged) {
+      payload.photos = img.galleryData;
     }
 
     setBusy(true);
@@ -214,16 +265,10 @@ function CarForm({ car, onCancel, onSaved }) {
 
       <div className="two">
         <label>
-          Category
-          <select value={f.is_ac ? 'ac' : 'non_ac'} onChange={(e) => setF({ ...f, is_ac: e.target.value === 'ac' })}>
-            <option value="ac">AC</option>
-            <option value="non_ac">Non-AC</option>
-          </select>
-        </label>
-        <label>
           Seats
           <input type="number" inputMode="numeric" min={1} max={60} required value={f.seats} onChange={set('seats')} />
         </label>
+        <div />
       </div>
 
       <div className="two">
@@ -254,18 +299,68 @@ function CarForm({ car, onCancel, onSaved }) {
       </label>
 
       <div className="photo-field">
-        <span className="label-text">Photos (optional)</span>
-        {img.preview && <img className="photo-preview" src={img.preview} alt="Car preview" />}
-        <div className="photo-btns">
-          <label className="btn btn-small file-btn">
-            {img.preview ? 'Add more photos' : 'Choose photos'}
-            <input type="file" accept="image/*" multiple onChange={pickImage} hidden />
-          </label>
-          {img.preview && (
-            <button type="button" className="btn btn-small" onClick={() => setImg({ preview: null, changed: true, data: [] })}>
-              Remove photos
-            </button>
+        <div className="photo-panel">
+          <span className="label-text">Primary photo</span>
+          {img.primary ? (
+            <div className="photo-tile photo-tile-primary">
+              <img className="photo-preview photo-preview-primary" src={img.primary} alt="Primary car preview" />
+              <button type="button" className="photo-remove photo-remove-primary" onClick={removePrimaryPhoto} aria-label="Remove primary photo">×</button>
+            </div>
+          ) : (
+            <div className="photo-empty-box">
+              <span>No primary photo selected</span>
+            </div>
           )}
+
+          {img.primary && (
+            <label className="btn btn-small file-btn compact-btn">
+              Change primary photo
+              <input type="file" accept="image/*" onChange={pickPrimaryImage} hidden />
+            </label>
+          )}
+          {!img.primary && (
+            <label className="btn btn-small file-btn compact-btn">
+              Choose primary photo
+              <input type="file" accept="image/*" onChange={pickPrimaryImage} hidden />
+            </label>
+          )}
+        </div>
+
+        <div className="photo-panel">
+          <span className="label-text">Gallery photos</span>
+          {img.gallery.length > 0 && (
+            <div className="multi-photo-preview">
+              {img.gallery.map((src, index) => (
+                <div key={`${src}-${index}`} className="photo-tile">
+                  <img className="photo-preview" src={src} alt={`Car gallery ${index + 1}`} />
+                  <button
+                    type="button"
+                    className="photo-remove"
+                    onClick={() => removeGalleryPhoto(index)}
+                    aria-label={`Remove gallery photo ${index + 1}`}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {!img.gallery.length && (
+            <div className="photo-empty-box photo-empty-box-small">
+              <span>No gallery photos yet</span>
+            </div>
+          )}
+          <div className="photo-btns">
+            <label className="btn btn-small file-btn">
+              Add gallery photos
+              <input type="file" accept="image/*" multiple onChange={pickGalleryImages} hidden />
+            </label>
+            {img.gallery.length > 0 && (
+              <button type="button" className="btn btn-small" onClick={() => setImg((prev) => ({ ...prev, gallery: [], galleryData: [], galleryChanged: true }))}>
+                Clear gallery
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

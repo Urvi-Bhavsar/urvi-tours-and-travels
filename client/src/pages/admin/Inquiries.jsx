@@ -34,6 +34,8 @@ export default function Inquiries() {
 
   const load = useCallback(async () => {
     setError('');
+    setItems([]);
+    setLoading(true);
     const params = {};
     if (filter === 'today') params.followup = 'today';
     else if (filter !== 'all') params.status = filter;
@@ -73,7 +75,6 @@ export default function Inquiries() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <button className="btn btn-small" onClick={() => api.downloadCsv().catch((e) => setError(e.message))}>Export CSV</button>
       </div>
 
       <div className="tabs">
@@ -85,10 +86,14 @@ export default function Inquiries() {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {loading ? <p className="muted">Loading...</p> : null}
+      {loading ? (
+        <div className="inline-loader" aria-label="Loading inquiries">
+          <span className="spinner" />
+        </div>
+      ) : null}
       {!loading && !items.length && !error ? <p className="muted">No inquiries here yet.</p> : null}
 
-      {items.map((it) => (
+      {!loading && items.map((it) => (
         <InquiryCard key={it.id} it={it} onChanged={load} />
       ))}
     </>
@@ -163,10 +168,7 @@ function InquiryCard({ it, onChanged }) {
       <div className="trip">
         <div className="trip-car">
           {it.car_name ? (
-            <>
-              <strong>{it.car_name}</strong> <span className="muted">({it.car_type})</span>
-              {it.car_rate != null && <span className="trip-rate"> &#8377;{it.car_rate}/km</span>}
-            </>
+            <strong>{it.car_name}</strong>
           ) : (
             <span className="muted">No car chosen</span>
           )}

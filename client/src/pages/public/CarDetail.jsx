@@ -20,7 +20,14 @@ export default function CarDetail() {
       .catch((e) => setState(/not found/i.test(e.message) ? 'missing' : 'error'));
   }, [id]);
 
-  if (state === 'loading') return <p className="muted section">Loading...</p>;
+  if (state === 'loading')
+    return (
+      <section className="section">
+        <div className="inline-loader" aria-label="Loading car details">
+          <span className="spinner" />
+        </div>
+      </section>
+    );
   if (state === 'missing')
     return (
       <section className="section">
@@ -38,26 +45,36 @@ export default function CarDetail() {
       </section>
     );
 
+  const primaryPhoto = car.image_url || car.photos?.[0] || null;
+  const secondaryPhotos = (car.photos || []).filter((photo) => photo !== primaryPhoto).slice(0, 4);
+  const acRate = car.rate_per_km ?? 0;
+  const nonAcRate = car.rate_per_km_non_ac ?? acRate;
+
   return (
     <section className="section detail">
       <Link className="link-inline" to="/cars">&larr; All cars</Link>
-      {car.photos?.length ? (
-        <div className="detail-gallery">
-          {car.photos.map((photo, index) => (
-            <img key={`${car.id}-${index}`} className="detail-img" src={assetUrl(photo)} alt={`${car.name} ${index + 1}`} />
-          ))}
-        </div>
-      ) : car.image_url ? (
-        <img className="detail-img" src={assetUrl(car.image_url)} alt={car.name} />
-      ) : (
-        <div className="detail-img car-img-empty">{car.is_ac ? 'AC' : 'Non-AC'}</div>
-      )}
+      <div className="detail-gallery">
+        {primaryPhoto ? (
+          <>
+            <img className="detail-img detail-img-main" src={assetUrl(primaryPhoto)} alt={car.name} />
+            {secondaryPhotos.length > 0 && (
+              <div className="detail-subgallery">
+                {secondaryPhotos.map((photo, index) => (
+                  <img key={`${car.id}-detail-${index}`} className="detail-img detail-img-thumb" src={assetUrl(photo)} alt={`${car.name} ${index + 2}`} />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="detail-img car-img-empty">{car.is_ac ? 'AC' : 'Non-AC'}</div>
+        )}
+      </div>
       <div className="car-row">
         <h2>{car.name}</h2>
-        <span className="car-type">{car.is_ac ? 'AC' : 'Non-AC'}</span>
       </div>
-      <div className="car-rate">
-        <strong>&#8377;{car.is_ac ? car.rate_per_km : car.rate_per_km_non_ac || car.rate_per_km}</strong>/km
+      <div className="detail-rates">
+        <div className="rate-line"><strong>&#8377;{acRate}</strong>/km  AC</div>
+        <div className="rate-line"><strong>&#8377;{nonAcRate}</strong>/km Non-AC</div>
       </div>
       <ul className="facts">
         <li>{car.seats} seats</li>
@@ -65,7 +82,7 @@ export default function CarDetail() {
         {car.driver_batta_per_day ? <li>Driver allowance: ₹{car.driver_batta_per_day}/day</li> : null}
       </ul>
       {car.description && <p>{car.description}</p>}
-      <p className="privacy left">Final fare depends on distance, tolls, parking and driver allowance. We will confirm on call.</p>
+      <p className="detail-note">Tolls and parking are extra and not included in the fare. Final fare depends on distance and driver allowance. We will confirm on call.</p>
       <Link className="btn btn-primary btn-wide" to={`/book?car=${car.id}`}>Book this car</Link>
     </section>
   );

@@ -24,7 +24,11 @@ export default function Cars() {
       <h2>Our cars</h2>
       <p className="muted">Rates are per km. Tap a car to see details or book it.</p>
 
-      {state === 'loading' && <p className="muted">Loading cars...</p>}
+      {state === 'loading' && (
+        <div className="inline-loader" aria-label="Loading cars">
+          <span className="spinner" />
+        </div>
+      )}
       {state === 'error' && <p className="muted">Could not load cars right now. Please try again, or call us.</p>}
       {state === 'ready' && !cars.length && <p className="muted">Cars will be listed here soon. Call us for rates.</p>}
 
