@@ -1,7 +1,7 @@
 # Urvi Tours & Travells
 
 live demo:
-https://urvi-tours-and-travells.vercel.app/
+https://urvi-tours-and-travels.vercel.app/
 
 Features:
 - AC and Non-AC car pricing
