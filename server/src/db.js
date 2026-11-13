@@ -48,18 +48,35 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS cars (
       id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(100) NOT NULL,
-      type VARCHAR(50) NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT '',
+      is_ac TINYINT(1) NOT NULL DEFAULT 1,
       seats INT NOT NULL DEFAULT 4,
-      rate_per_km DECIMAL(10,2) NOT NULL,
+      rate_per_km DECIMAL(10,2) NOT NULL DEFAULT 0,
+      rate_per_km_non_ac DECIMAL(10,2) NOT NULL DEFAULT 0,
+      driver_batta_per_day DECIMAL(10,2) NOT NULL DEFAULT 0,
       min_km_per_day INT NULL,
       description VARCHAR(500) NOT NULL DEFAULT '',
       image MEDIUMTEXT NULL,
+      photos MEDIUMTEXT NULL,
       active TINYINT(1) NOT NULL DEFAULT 1,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_cars_active (active)
     ) DEFAULT CHARSET = utf8mb4
   `);
+
+  for (const stmt of [
+    "ALTER TABLE cars ADD COLUMN IF NOT EXISTS is_ac TINYINT(1) NOT NULL DEFAULT 1",
+    "ALTER TABLE cars ADD COLUMN IF NOT EXISTS rate_per_km_non_ac DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE cars ADD COLUMN IF NOT EXISTS driver_batta_per_day DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE cars ADD COLUMN IF NOT EXISTS photos MEDIUMTEXT NULL",
+  ]) {
+    try {
+      await pool.query(stmt);
+    } catch (err) {
+      console.warn('Car migration skipped:', err.message);
+    }
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS inquiries (
@@ -113,24 +130,48 @@ export function toIso(ts) {
 
 // Car columns for lists. The photo itself (a big base64 string) is NOT selected here;
 // it is served separately from /api/cars/:id/image.
-export const CAR_COLS = `id, name, type, seats, rate_per_km, min_km_per_day, description, active, updated_at,
+export const CAR_COLS = `id, name, type, is_ac, seats, rate_per_km, rate_per_km_non_ac, driver_batta_per_day, min_km_per_day, description, image, photos, active, updated_at,
   CASE WHEN image IS NULL OR image = '' THEN 0 WHEN image LIKE 'http%' THEN 2 ELSE 1 END AS image_kind,
   CASE WHEN image LIKE 'http%' THEN image ELSE NULL END AS image_link`;
 
 // Shape sent to the frontend
 export function carDto(c) {
-  let image_url = null;
-  if (c.image_kind === 2) image_url = c.image_link;
-  else if (c.image_kind === 1) image_url = `/api/cars/${c.id}/image?v=${Date.parse(`${String(c.updated_at).replace(' ', 'T')}Z`) || 0}`;
+  let primaryImage = null;
+  let photos = [];
+
+  try {
+    const parsedPhotos = c.photos ? JSON.parse(c.photos) : [];
+    if (Array.isArray(parsedPhotos)) {
+      photos = parsedPhotos.filter(Boolean);
+    }
+  } catch {
+    photos = [];
+  }
+
+  if (photos.length === 0 && c.image) photos.push(c.image);
+
+  if (c.image_kind === 2) primaryImage = c.image_link;
+  else if (c.image_kind === 1) primaryImage = `/api/cars/${c.id}/image?v=${Date.parse(`${String(c.updated_at).replace(' ', 'T')}Z`) || 0}`;
+  else if (photos[0]) primaryImage = photos[0];
+
+  if (primaryImage && !photos.includes(primaryImage)) photos.unshift(primaryImage);
+
+  const baseRate = Number(c.rate_per_km || 0);
+  const nonAcRate = Number(c.rate_per_km_non_ac ?? baseRate);
+
   return {
     id: String(c.id),
     name: c.name,
-    type: c.type,
+    type: c.type || (c.is_ac ? 'AC' : 'Non-AC'),
+    is_ac: !!c.is_ac,
     seats: c.seats,
-    rate_per_km: Number(c.rate_per_km),
+    rate_per_km: baseRate,
+    rate_per_km_non_ac: nonAcRate,
+    driver_batta_per_day: Number(c.driver_batta_per_day || 0),
     min_km_per_day: c.min_km_per_day,
     description: c.description || '',
-    image_url,
+    image_url: primaryImage,
+    photos: photos.map((p) => (p.startsWith('/') ? p : p)),
     active: !!c.active,
   };
 }

@@ -46,16 +46,20 @@ const imageField = z
 
 const carBody = z.object({
   name: z.string().trim().min(2, 'Car name is required').max(100),
-  type: z.string().trim().min(2, 'Car type is required').max(50),
+  type: z.string().trim().max(50).optional(),
+  is_ac: z.boolean().optional(),
   seats: z.number().int().min(1).max(60),
-  rate_per_km: z.number({ invalid_type_error: 'Enter the rate per km' }).min(0).max(10000),
+  rate_per_km: z.number({ invalid_type_error: 'Enter the AC rate per km' }).min(0).max(10000),
+  rate_per_km_non_ac: z.number({ invalid_type_error: 'Enter the non-AC rate per km' }).min(0).max(10000).nullable().optional(),
+  driver_batta_per_day: z.number().min(0).max(10000).nullable().optional(),
   min_km_per_day: z.number().int().min(0).max(5000).nullable().optional(),
   description: z.string().trim().max(500).optional(),
   image: imageField,
+  photos: z.array(imageField).optional(),
   active: z.boolean().optional(),
 });
 
-const CAR_FIELDS = ['name', 'type', 'seats', 'rate_per_km', 'min_km_per_day', 'description', 'image', 'active'];
+const CAR_FIELDS = ['name', 'type', 'is_ac', 'seats', 'rate_per_km', 'rate_per_km_non_ac', 'driver_batta_per_day', 'min_km_per_day', 'description', 'image', 'photos', 'active'];
 
 async function findCar(id) {
   const [rows] = await pool.query(`SELECT ${CAR_COLS} FROM cars WHERE id = ?`, [id]);
@@ -71,9 +75,25 @@ router.post('/cars', async (req, res) => {
   const parsed = carBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const d = parsed.data;
+  const resolvedType = (d.type || (d.is_ac === false ? 'Non-AC' : 'AC')).trim() || (d.is_ac === false ? 'Non-AC' : 'AC');
+  const finalPhotos = Array.isArray(d.photos) ? d.photos.filter(Boolean) : [];
+  const photoList = finalPhotos.length ? JSON.stringify(finalPhotos) : null;
   const [r] = await pool.query(
-    'INSERT INTO cars (name, type, seats, rate_per_km, min_km_per_day, description, image, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [d.name, d.type, d.seats, d.rate_per_km, d.min_km_per_day ?? null, d.description ?? '', d.image ?? null, d.active === false ? 0 : 1]
+    'INSERT INTO cars (name, type, is_ac, seats, rate_per_km, rate_per_km_non_ac, driver_batta_per_day, min_km_per_day, description, image, photos, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      d.name,
+      resolvedType,
+      d.is_ac === false ? 0 : 1,
+      d.seats,
+      d.rate_per_km,
+      d.rate_per_km_non_ac ?? d.rate_per_km,
+      d.driver_batta_per_day ?? 0,
+      d.min_km_per_day ?? null,
+      d.description ?? '',
+      d.image ?? (finalPhotos[0] ?? null),
+      photoList,
+      d.active === false ? 0 : 1,
+    ]
   );
   res.json({ car: carDto(await findCar(r.insertId)) });
 });
@@ -86,8 +106,29 @@ router.patch('/cars/:id', async (req, res) => {
   const params = [];
   for (const f of CAR_FIELDS) {
     if (parsed.data[f] !== undefined) {
-      sets.push(`\`${f}\` = ?`); // column names come from the fixed list above, never from the request
-      params.push(f === 'active' ? (parsed.data[f] ? 1 : 0) : parsed.data[f]);
+      if (f === 'photos') {
+        const value = Array.isArray(parsed.data[f]) ? parsed.data[f].filter(Boolean) : null;
+        sets.push('`photos` = ?');
+        params.push(value && value.length ? JSON.stringify(value) : null);
+        continue;
+      }
+      if (f === 'active') {
+        sets.push('`active` = ?');
+        params.push(parsed.data[f] ? 1 : 0);
+        continue;
+      }
+      if (f === 'is_ac') {
+        sets.push('`is_ac` = ?');
+        params.push(parsed.data[f] ? 1 : 0);
+        continue;
+      }
+      if (f === 'type' && parsed.data[f] !== undefined) {
+        sets.push('`type` = ?');
+        params.push((parsed.data[f] || (parsed.data.is_ac === false ? 'Non-AC' : 'AC')).trim() || (parsed.data.is_ac === false ? 'Non-AC' : 'AC'));
+        continue;
+      }
+      sets.push(`\`${f}\` = ?`);
+      params.push(parsed.data[f]);
     }
   }
   if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });

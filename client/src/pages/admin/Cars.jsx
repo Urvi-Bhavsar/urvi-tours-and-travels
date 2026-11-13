@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, assetUrl } from '../../api.js';
-import { carTypes } from '../../config.js';
 
 // Shrink a phone photo to ~800px wide JPEG so it is small enough to store (~100 KB)
 function resizeImage(file, maxW = 800, quality = 0.75) {
@@ -24,13 +23,23 @@ function resizeImage(file, maxW = 800, quality = 0.75) {
   });
 }
 
-const blank = { name: '', type: 'Sedan', seats: '4', rate_per_km: '', min_km_per_day: '', description: '', active: true };
+const blank = {
+  name: '',
+  is_ac: true,
+  seats: '4',
+  rate_per_km: '',
+  rate_per_km_non_ac: '',
+  driver_batta_per_day: '',
+  min_km_per_day: '',
+  description: '',
+  active: true,
+};
 
 export default function Cars() {
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editing, setEditing] = useState(null); // null | 'new' | car id
+  const [editing, setEditing] = useState(null);
   const formTop = useRef(null);
 
   async function load() {
@@ -72,7 +81,7 @@ export default function Cars() {
   return (
     <>
       <div className="row-between">
-        <p className="muted">Cars shown on your public page, with rate per km.</p>
+        <p className="muted">Cars shown on your public page with AC / Non-AC pricing and driver allowance.</p>
         <button className="btn btn-small btn-primary" onClick={() => openForm('new')}>+ Add car</button>
       </div>
 
@@ -90,27 +99,34 @@ export default function Cars() {
       {loading && <p className="muted">Loading...</p>}
       {!loading && !cars.length && !error && <p className="muted">No cars yet. Tap "Add car" to add your first one.</p>}
 
-      {cars.map((c) => (
-        <div className={`car-row-admin ${c.active ? '' : 'inactive'}`} key={c.id}>
-          {c.image_url ? (
-            <img className="thumb" src={assetUrl(c.image_url)} alt="" />
-          ) : (
-            <div className="thumb thumb-empty">{c.type.slice(0, 3)}</div>
-          )}
-          <div className="car-info">
-            <strong>{c.name}</strong>
-            <div className="muted small">
-              {c.type} · {c.seats} seats{c.min_km_per_day ? ` · min ${c.min_km_per_day} km/day` : ''}
+      {cars.map((c) => {
+        const rate = c.is_ac ? c.rate_per_km : c.rate_per_km_non_ac || c.rate_per_km;
+        return (
+          <div className={`car-row-admin ${c.active ? '' : 'inactive'}`} key={c.id}>
+            {c.image_url ? (
+              <img className="thumb" src={assetUrl(c.image_url)} alt="" />
+            ) : (
+              <div className="thumb thumb-empty">{c.is_ac ? 'AC' : 'N'}</div>
+            )}
+            <div className="car-info">
+              <strong>{c.name}</strong>
+              <div className="muted small">
+                {c.is_ac ? 'AC' : 'Non-AC'} · {c.seats} seats{c.min_km_per_day ? ` · min ${c.min_km_per_day} km/day` : ''}
+              </div>
+              <div className="car-price">
+                &#8377;{rate}/km
+                {c.driver_batta_per_day ? ` · driver ₹${c.driver_batta_per_day}/day` : ''}
+                {!c.active && <span className="badge badge-closed">Hidden</span>}
+              </div>
             </div>
-            <div className="car-price">&#8377;{c.rate_per_km}/km {!c.active && <span className="badge badge-closed">Hidden</span>}</div>
+            <div className="car-actions">
+              <button className="btn btn-small" onClick={() => openForm(c.id)}>Edit</button>
+              <button className="btn btn-small" onClick={() => toggleActive(c)}>{c.active ? 'Hide' : 'Show'}</button>
+              <button className="btn btn-small danger-btn" onClick={() => remove(c)}>Delete</button>
+            </div>
           </div>
-          <div className="car-actions">
-            <button className="btn btn-small" onClick={() => openForm(c.id)}>Edit</button>
-            <button className="btn btn-small" onClick={() => toggleActive(c)}>{c.active ? 'Hide' : 'Show'}</button>
-            <button className="btn btn-small danger-btn" onClick={() => remove(c)}>Delete</button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -120,29 +136,30 @@ function CarForm({ car, onCancel, onSaved }) {
     car
       ? {
           name: car.name,
-          type: car.type,
+          is_ac: !!car.is_ac,
           seats: String(car.seats),
-          rate_per_km: String(car.rate_per_km),
+          rate_per_km: String(car.rate_per_km ?? ''),
+          rate_per_km_non_ac: String(car.rate_per_km_non_ac ?? ''),
+          driver_batta_per_day: String(car.driver_batta_per_day ?? ''),
           min_km_per_day: car.min_km_per_day ? String(car.min_km_per_day) : '',
           description: car.description || '',
           active: car.active,
         }
       : blank
   );
-  // image: preview = what is shown; changed = true when admin picked/removed a photo; data = new data URL or null
-  const [img, setImg] = useState({ preview: car?.image_url ? assetUrl(car.image_url) : null, changed: false, data: null });
+  const [img, setImg] = useState({ preview: car?.image_url ? assetUrl(car.image_url) : null, changed: false, data: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   async function pickImage(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setError('');
     try {
-      const data = await resizeImage(file);
-      setImg({ preview: data, changed: true, data });
+      const data = await Promise.all(files.map((file) => resizeImage(file)));
+      setImg({ preview: data[0], changed: true, data });
     } catch (err) {
       setError(err.message);
     }
@@ -152,19 +169,27 @@ function CarForm({ car, onCancel, onSaved }) {
   async function save(e) {
     e.preventDefault();
     setError('');
+
     const rate = Number(f.rate_per_km);
-    if (!f.rate_per_km || Number.isNaN(rate) || rate <= 0) return setError('Enter a rate per km greater than 0');
+    const nonAcRate = Number(f.rate_per_km_non_ac || 0);
+    if (!Number.isFinite(rate) || rate < 0) return setError('Enter a valid AC rate per km');
+    if (f.rate_per_km_non_ac && (!Number.isFinite(nonAcRate) || nonAcRate < 0)) return setError('Enter a valid non-AC rate per km');
 
     const payload = {
       name: f.name,
-      type: f.type,
+      is_ac: Boolean(f.is_ac),
       seats: Number(f.seats) || 4,
       rate_per_km: rate,
+      rate_per_km_non_ac: f.rate_per_km_non_ac ? nonAcRate : 0,
+      driver_batta_per_day: f.driver_batta_per_day ? Number(f.driver_batta_per_day) : 0,
       min_km_per_day: f.min_km_per_day ? Number(f.min_km_per_day) : null,
       description: f.description,
       active: f.active,
     };
-    if (img.changed) payload.image = img.data; // new photo, or null to remove
+    if (img.changed) {
+      payload.photos = img.data;
+      payload.image = img.data[0] || null;
+    }
 
     setBusy(true);
     try {
@@ -189,11 +214,11 @@ function CarForm({ car, onCancel, onSaved }) {
 
       <div className="two">
         <label>
-          Type
-          <input required list="car-types" maxLength={50} value={f.type} onChange={set('type')} />
-          <datalist id="car-types">
-            {carTypes.map((t) => <option key={t} value={t} />)}
-          </datalist>
+          Category
+          <select value={f.is_ac ? 'ac' : 'non_ac'} onChange={(e) => setF({ ...f, is_ac: e.target.value === 'ac' })}>
+            <option value="ac">AC</option>
+            <option value="non_ac">Non-AC</option>
+          </select>
         </label>
         <label>
           Seats
@@ -203,8 +228,19 @@ function CarForm({ car, onCancel, onSaved }) {
 
       <div className="two">
         <label>
-          Rate per km (&#8377;)
+          AC rate per km (&#8377;)
           <input type="number" inputMode="decimal" step="0.5" min={0} required value={f.rate_per_km} onChange={set('rate_per_km')} placeholder="e.g. 12" />
+        </label>
+        <label>
+          Non-AC rate per km (&#8377;)
+          <input type="number" inputMode="decimal" step="0.5" min={0} value={f.rate_per_km_non_ac} onChange={set('rate_per_km_non_ac')} placeholder="e.g. 9" />
+        </label>
+      </div>
+
+      <div className="two">
+        <label>
+          Driver allowance per day (&#8377;)
+          <input type="number" inputMode="decimal" step="0.5" min={0} value={f.driver_batta_per_day} onChange={set('driver_batta_per_day')} placeholder="e.g. 500" />
         </label>
         <label>
           Min km per day (optional)
@@ -214,20 +250,20 @@ function CarForm({ car, onCancel, onSaved }) {
 
       <label>
         Short description (optional)
-        <textarea rows={2} maxLength={500} value={f.description} onChange={set('description')} placeholder="AC, 4 bags luggage space, CNG..." />
+        <textarea rows={2} maxLength={500} value={f.description} onChange={set('description')} placeholder="4 bags, full-time driver, air conditioning..." />
       </label>
 
       <div className="photo-field">
-        <span className="label-text">Photo (optional)</span>
+        <span className="label-text">Photos (optional)</span>
         {img.preview && <img className="photo-preview" src={img.preview} alt="Car preview" />}
         <div className="photo-btns">
           <label className="btn btn-small file-btn">
-            {img.preview ? 'Change photo' : 'Choose photo'}
-            <input type="file" accept="image/*" onChange={pickImage} hidden />
+            {img.preview ? 'Add more photos' : 'Choose photos'}
+            <input type="file" accept="image/*" multiple onChange={pickImage} hidden />
           </label>
           {img.preview && (
-            <button type="button" className="btn btn-small" onClick={() => setImg({ preview: null, changed: true, data: null })}>
-              Remove photo
+            <button type="button" className="btn btn-small" onClick={() => setImg({ preview: null, changed: true, data: [] })}>
+              Remove photos
             </button>
           )}
         </div>

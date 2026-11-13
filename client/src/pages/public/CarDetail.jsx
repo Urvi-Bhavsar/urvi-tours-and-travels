@@ -41,21 +41,28 @@ export default function CarDetail() {
   return (
     <section className="section detail">
       <Link className="link-inline" to="/cars">&larr; All cars</Link>
-      {car.image_url ? (
+      {car.photos?.length ? (
+        <div className="detail-gallery">
+          {car.photos.map((photo, index) => (
+            <img key={`${car.id}-${index}`} className="detail-img" src={assetUrl(photo)} alt={`${car.name} ${index + 1}`} />
+          ))}
+        </div>
+      ) : car.image_url ? (
         <img className="detail-img" src={assetUrl(car.image_url)} alt={car.name} />
       ) : (
-        <div className="detail-img car-img-empty">{car.type}</div>
+        <div className="detail-img car-img-empty">{car.is_ac ? 'AC' : 'Non-AC'}</div>
       )}
       <div className="car-row">
         <h2>{car.name}</h2>
-        <span className="car-type">{car.type}</span>
+        <span className="car-type">{car.is_ac ? 'AC' : 'Non-AC'}</span>
       </div>
       <div className="car-rate">
-        <strong>&#8377;{car.rate_per_km}</strong>/km
+        <strong>&#8377;{car.is_ac ? car.rate_per_km : car.rate_per_km_non_ac || car.rate_per_km}</strong>/km
       </div>
       <ul className="facts">
         <li>{car.seats} seats</li>
         {car.min_km_per_day ? <li>Minimum {car.min_km_per_day} km per day</li> : null}
+        {car.driver_batta_per_day ? <li>Driver allowance: ₹{car.driver_batta_per_day}/day</li> : null}
       </ul>
       {car.description && <p>{car.description}</p>}
       <p className="privacy left">Final fare depends on distance, tolls, parking and driver allowance. We will confirm on call.</p>

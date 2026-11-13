@@ -94,7 +94,7 @@ export default function Book() {
             <option value="">Not sure - suggest me one</option>
             {cars.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} ({c.type}) - &#8377;{c.rate_per_km}/km
+                {c.name} - &#8377;{c.is_ac ? c.rate_per_km : (c.rate_per_km_non_ac || c.rate_per_km)}/km
               </option>
             ))}
           </select>
